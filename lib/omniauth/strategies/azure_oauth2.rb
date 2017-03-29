@@ -23,17 +23,23 @@ module OmniAuth
           provider = options  # if pass has to config, get mapped right on to ptions
         end
 
+        if provider.respond_to?(:resource_url)
+          resource_url =
+            provider.resource_url =~ %r{https?://} ? provider.resource_url : "https://#{provider.resource_url}"
+        else
+          options.token_params.resource = options.resource
+        end
+
         options.client_id = provider.client_id
         options.client_secret = provider.client_secret
         options.tenant_id =
           provider.respond_to?(:tenant_id) ? provider.tenant_id : 'common'
 
         options.authorize_params.domain_hint = provider.domain_hint if provider.respond_to?(:domain_hint) && provider.domain_hint
-        options.authorize_params.prompt = request.params['prompt'] if request.params['prompt']
+        # options.authorize_params.prompt = request.params['prompt'] if request.params.present? && request.params['prompt']
         options.client_options.authorize_url = "#{BASE_AZURE_URL}/#{options.tenant_id}/oauth2/authorize"
+        options.client_options.authorize_url += "?resource=#{resource_url}" if resource_url
         options.client_options.token_url = "#{BASE_AZURE_URL}/#{options.tenant_id}/oauth2/token"
-
-        options.token_params.resource = options.resource
         super
       end
 
