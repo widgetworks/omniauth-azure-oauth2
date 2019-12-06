@@ -13,27 +13,28 @@ module OmniAuth
       # AD resource identifier
       option :resource, '00000002-0000-0000-c000-000000000000'
 
-      # tenant_provider must return client_id, client_secret and optionally tenant_id
+      # tenant_provider must return client_id, client_secret and optionally tenant_id and base_azure_url
       args [:tenant_provider]
 
       def client
         if options.tenant_provider
           provider = options.tenant_provider.new(self)
         else
-          provider = options  # if pass has to config, get mapped right on to ptions
+          provider = options  # if pass has to config, get mapped right on to options
         end
 
         options.client_id = provider.client_id
         options.client_secret = provider.client_secret
         options.tenant_id =
           provider.respond_to?(:tenant_id) ? provider.tenant_id : 'common'
+        options.base_azure_url =
+          provider.respond_to?(:base_azure_url) ? provider.base_azure_url : BASE_AZURE_URL
 
+        options.authorize_params = provider.authorize_params if provider.respond_to?(:authorize_params)
         options.authorize_params.domain_hint = provider.domain_hint if provider.respond_to?(:domain_hint) && provider.domain_hint
-        options.authorize_params.prompt = request.params['prompt'] if request.params['prompt']
-        options.client_options.authorize_url = "#{BASE_AZURE_URL}/#{options.tenant_id}/oauth2/authorize"
-        options.client_options.token_url = "#{BASE_AZURE_URL}/#{options.tenant_id}/oauth2/token"
-
-        options.token_params.resource = options.resource
+        options.authorize_params.prompt = request.params['prompt'] if defined? request && request.params['prompt']
+        options.client_options.authorize_url = "#{options.base_azure_url}/#{options.tenant_id}/oauth2/authorize"
+        options.client_options.token_url = "#{options.base_azure_url}/#{options.tenant_id}/oauth2/token"
         super
       end
 
@@ -51,6 +52,11 @@ module OmniAuth
           oid: raw_info['oid'],
           tid: raw_info['tid']
         }
+      end
+
+      def token_params
+        azure_resource = request.env['omniauth.params'] && request.env['omniauth.params']['azure_resource']
+        super.merge(resource: azure_resource || options.resource)
       end
 
       def callback_url
